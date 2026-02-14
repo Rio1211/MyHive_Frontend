@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -8,8 +8,54 @@ const Login = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
+  const [guidePosition, setGuidePosition] = useState({ x: 24, y: 24 })
+  const [isDraggingGuide, setIsDraggingGuide] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const { login } = useAuth()
   const navigate = useNavigate()
+  const guideRef = useRef(null)
+
+  const handleGuidePointerDown = (e) => {
+    if (!guideRef.current) return
+    const rect = guideRef.current.getBoundingClientRect()
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    })
+    setIsDraggingGuide(true)
+  }
+
+  useEffect(() => {
+    if (!isDraggingGuide) {
+      document.body.style.userSelect = ''
+      return
+    }
+
+    const handlePointerMove = (e) => {
+      if (!guideRef.current) return
+      const guideWidth = guideRef.current.offsetWidth
+      const guideHeight = guideRef.current.offsetHeight
+      const maxX = window.innerWidth - guideWidth - 12
+      const maxY = window.innerHeight - guideHeight - 12
+      const nextX = Math.min(Math.max(12, e.clientX - dragOffset.x), maxX)
+      const nextY = Math.min(Math.max(12, e.clientY - dragOffset.y), maxY)
+      setGuidePosition({ x: nextX, y: nextY })
+    }
+
+    const handlePointerUp = () => {
+      setIsDraggingGuide(false)
+    }
+
+    document.body.style.userSelect = 'none'
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+
+    return () => {
+      document.body.style.userSelect = ''
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [isDraggingGuide, dragOffset])
 
   // Handle form submission for user login
   const handleSubmit = async (e) => {
@@ -45,6 +91,24 @@ const Login = () => {
 
   return (
     <div className="relative min-h-screen bg-white flex flex-col items-center justify-center px-4">
+      <div
+        ref={guideRef}
+        className="fixed z-20 w-72 rounded-xl border border-yellow-300 bg-yellow-100/95 shadow-lg"
+        style={{ left: `${guidePosition.x}px`, top: `${guidePosition.y}px` }}
+      >
+        <div
+          className={`rounded-t-xl bg-yellow-300 px-4 py-2 text-sm font-semibold text-amber-900 select-none ${isDraggingGuide ? 'cursor-grabbing' : 'cursor-grab'}`}
+          onPointerDown={handleGuidePointerDown}
+        >
+          Login Guide (Drag Me)
+        </div>
+        <div className="px-4 py-3 text-sm text-amber-900 leading-6">
+          <p className="font-medium">Use <code>{'{role}@gmail.com'}</code> with password <code>{'{role}'}</code> to sign in.</p>
+          <p className="font-medium">Four default users available for you to use: "<code>admin@gmail.com</code>", "<code>hr@gmail.com</code>", "<code>manager@gmail.com</code>", "<code>user@gmail.com</code>"</p>
+          <p className="mt-2 text-xs text-amber-800">Example: <code>admin@gmail.com</code> / <code>admin</code></p>
+        </div>
+      </div>
+
       <div className="flex flex-col items-center gap-8 w-full max-w-sm">
         {/* Logo Section */}
         <div className="flex items-center gap-2">
